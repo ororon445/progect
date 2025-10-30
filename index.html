@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Оборона Від Зомбі</title>
+    <!-- Завантажуємо Tailwind CSS для стилізації -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Зомбі-апокаліпсис палітра
+                        'military-dark': '#1a1a1a',      
+                        'military-green': '#4a553a',    
+                        'military-metal': '#8d9491',    
+                        'military-text': '#dee2e6',     
+                        'resource-yellow': '#ffc107',   // Ресурси 
+                        'integrity-red': '#dc3545',     // Цілісність бази
+                        'ui-accent': '#0d6efd',         // Синій акцент 
+                        'boss-purple': '#6f42c1',       // Колір Боса
+                        'zombie-skin': '#556B2F',       // Колір зомбі
+                        'zombie-slow': '#4990e8',       // Колір уповільненого зомбі
+                        'disintegrator-beam': '#ff00ff', // Дезінтегратор
+                        'time-trap-color': '#9333ea',    // Часова Пастка
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Стиль для фону (темний, текстурований) */
+        body {
+            background-color: #1a1a1a;
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.9)), 
+                url('https://www.transparenttextures.com/patterns/dark-metal.png'); 
+            background-attachment: fixed;
+        }
+        
+        /* Головний контейнер (вигляд металевої панелі управління) */
+        #game-container {
+            background-color: #212529; 
+            border: 2px solid #495057;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7), inset 0 0 15px rgba(0, 0, 0, 0.6); 
+            border-radius: 0.5rem; 
+        }
+
+        /* Стилі для 3D кнопок дій */
+        .action-button {
+            transition: all 0.1s ease-out;
+            border-radius: 0.5rem;
+            box-shadow: 0 5px 0 0 var(--depth-color, #212529), 0 8px 15px rgba(0, 0, 0, 0.5); 
+            border-bottom: 4px solid var(--depth-color, #212529); 
+        }
+        .action-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 0 0 var(--depth-color, #212529), 0 10px 20px rgba(0, 0, 0, 0.6);
+            filter: brightness(1.1);
+        }
+        .action-button:active {
+            transform: translateY(4px); 
+            box-shadow: 0 1px 0 0 var(--depth-color, #212529), 0 2px 5px rgba(0, 0, 0, 0.4); 
+            border-bottom-width: 1px;
+        }
+        /* Визначення кольору глибини для кнопок */
+        .btn-green { --depth-color: #313824; }
+        .btn-red { --depth-color: #a02834; }
+        .btn-yellow { --depth-color: #b38b05; }
+        .btn-blue { --depth-color: #0c4a92; }
+        .btn-dark { --depth-color: #0f0f0f; }
+
+        /* Стилі для ігрового полотна (асфальт/бетон) */
+        #gameCanvas {
+            background-color: #5a6670; 
+            border: 2px solid #1a1a1a;
+            border-radius: 4px;
+            touch-action: none; 
+            /* Забезпечуємо адаптивність */
+            width: 100%; 
+            height: auto; 
+            max-width: 800px;
+        }
+    </style>
+</head>
+<body class="font-sans flex items-center justify-center min-h-screen p-2 md:p-4">
+
+    <div id="game-container" class="w-full max-w-4xl p-4 md:p-6 rounded-lg text-military-text">
+        
+        <!-- Секція статистики (ПЕРЕМІЩЕНА ВГОРУ ДЛЯ МОБІЛЬНОГО ПЕРЕГЛЯДУ) -->
+        <section id="stats-section" class="bg-military-dark/70 p-3 rounded-md mb-4 border border-military-metal/20 grid grid-cols-3 gap-3">
+            <div class="text-center p-2 bg-military-dark rounded shadow-inner">
+                <p class="text-sm font-light text-military-text/70">💰 Ресурси</p>
+                <p id="gold" class="text-2xl md:text-3xl font-bold text-resource-yellow">150</p>
+            </div>
+            <div class="text-center p-2 bg-military-dark rounded shadow-inner">
+                <p class="text-sm font-light text-military-text/70">❤️ Цілісність Бази</p>
+                <p id="lives" class="text-2xl md:text-3xl font-bold text-integrity-red">10</p>
+            </div>
+            <div class="text-center p-2 bg-military-dark rounded shadow-inner">
+                <p class="text-sm font-light text-military-text/70">🌊 Хвиля</p>
+                <p id="wave" class="text-2xl md:text-3xl font-bold text-ui-accent">0</p>
+            </div>
+        </section>
+
+        <!-- Ігрове Полотно -->
+        <div class="flex justify-center mb-4 relative">
+            <canvas id="gameCanvas" width="800" height="400"></canvas>
+        </div>
+        
+        <!-- Секція дій та покращень -->
+        <section id="actions-section" class="mb-4">
+            <h2 class="text-xl font-semibold mb-3 text-resource-yellow">ПАНЕЛЬ УПРАВЛІННЯ</h2>
+            
+            <!-- Кнопки розміщення -->
+            <div id="placement-buttons" class="grid grid-cols-4 sm:grid-cols-6 gap-3 mb-4">
+                
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <!-- Секція Покращення -->
+                <div id="upgrade-section" class="md:col-span-2 bg-military-dark/70 p-3 rounded-md border border-military-metal/20 text-center flex flex-col items-center justify-center">
+                    <p id="tower-info" class="text-xs text-military-text/80 mb-2">Натисніть на турель для вибору.</p>
+                    <div class="w-full grid grid-cols-2 gap-2">
+                        <button id="upgrade-tower-btn" disabled class="action-button bg-gray-600/50 text-white py-2 px-4 rounded-md font-semibold w-full text-sm">
+                            <span id="upgrade-button-text">Покращити</span>
+                            <span id="upgrade-cost-display" class="block text-xs text-resource-yellow/70 mt-1">Ціна: -</span>
+                        </button>
+                        <button id="sell-tower-btn" disabled class="action-button bg-gray-600/50 text-white py-2 px-4 rounded-md font-semibold w-full text-sm">
+                            <span id="sell-button-text">Продати</span>
+                            <span id="sell-value-display" class="block text-xs text-green-400/70 mt-1">Виручка: -</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Запустити Наступну Хвилю -->
+                <button id="start-wave-btn" class="action-button bg-integrity-red btn-red text-white py-3 px-4 rounded-md hover:bg-integrity-red/80 font-bold flex flex-col items-center justify-center">
+                    <span id="wave-button-text" class="text-md">Запустити Хвилю 1</span>
+                    <span class="text-sm font-normal text-military-text/90 mt-1">До бою!</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Секція журналу подій -->
+        <section id="log-section">
+            <h2 class="text-lg font-semibold mb-2 text-resource-yellow">Журнал Бойових Дій</h2>
+            <div id="game-log" class="h-20 overflow-y-auto bg-black/50 p-2 rounded-md text-xs leading-relaxed border border-white/10 font-mono">
+                <!-- Повідомлення з'являтимуться тут -->
+            </div>
+        </section>
+
+        <!-- Модальне вікно -->
+        <div id="modal" class="fixed inset-0 bg-black bg-opacity-85 hidden items-center justify-center p-4 z-50">
+            <div class="bg-military-dark p-6 rounded-md border-2 border-military-metal shadow-2xl max-w-sm w-full text-center">
+                <h3 id="modal-title" class="text-2xl font-bold text-resource-yellow mb-4"></h3>
+                <p id="modal-message" class="text-lg text-military-text mb-6"></p>
+                <button id="modal-close-btn" class="action-button bg-integrity-red btn-red text-white py-2 px-6 rounded-md font-semibold">Зрозуміло</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Ігрові константи
+        const CANVAS_WIDTH = 800;
+        const CANVAS_HEIGHT = 400;
+        const TILE_SIZE = 40;
+        
+        let maxBaseLives = 10; // Змінна для максимальних життів, щоб Бункер міг її збільшувати
+
+        const BOSS_WAVE_INTERVAL = 10; 
+        const MAX_TOWER_LEVEL = 20;
+        const UPGRADE_COST_BASE = 50;
+        const SELL_REFUND_PERCENTAGE = 0.75;
+
+        // Визначення типів турелей
+        const TOWER_DEFINITIONS = {
+            CANNON: { name: 'Гармата', cost: 100, damage: 15, range: 120, cooldown: 40, color: '#6c757d', icon: '💣', upgradeDamage: 7.5, upgradeCooldown: 2 },
+            SNIPER: { name: 'Снайпер', cost: 250, damage: 150, range: 300, cooldown: 120, color: '#212529', icon: '🔭', upgradeDamage: 75, upgradeCooldown: 10 },
+            TESLA: { name: 'Тесла', cost: 200, damage: 8, range: 100, cooldown: 10, color: '#0d6efd', icon: '⚡', chainTargets: 2, upgradeDamage: 4, upgradeCooldown: 0 },
+            SLOW: { name: 'Уповільнювач', cost: 120, damage: 5, range: 150, cooldown: 60, color: '#4a553a', icon: '🧊', slowDuration: 180, slowFactor: 0.5, upgradeDuration: 30, upgradeCooldown: 3 },
+            MINE: { name: 'Шахта', cost: 150, damage: 0, range: 0, cooldown: 300, color: '#ffc107', icon: '💰', income: 10, upgradeIncome: 5 },
+            FLAMETHROWER: { name: 'Вогнемет', cost: 180, damage: 2, range: 80, cooldown: 5, color: '#fd7e14', icon: '🔥', upgradeDamage: 1, dotDuration: 120 },
+            ROCKET_LAUNCHER: { name: 'Ракетниця', cost: 350, damage: 80, range: 250, cooldown: 180, color: '#6f42c1', icon: '🚀', upgradeDamage: 40, upgradeCooldown: 10, aoeRadius: 50 },
+            GATLING: { name: 'Кулемет', cost: 220, damage: 10, range: 150, cooldown: 15, color: '#343a40', icon: '⚙️', upgradeDamage: 5, upgradeCooldown: 0.5 },
+            MORTAR: { name: 'Мортира', cost: 400, damage: 100, range: 400, cooldown: 240, color: '#495057', icon: '🎯', upgradeDamage: 50, upgradeCooldown: 15, aoeRadius: 60, minRange: 100 },
+            RAILGUN: { name: 'Рельсотрон', cost: 500, damage: 300, range: 500, cooldown: 300, color: '#0dcaf0', icon: '➡️', upgradeDamage: 150, upgradeCooldown: 20 },
+            SUPPORT: { name: 'Підтримка', cost: 300, damage: 0, range: 100, cooldown: 0, color: '#20c997', icon: '➕', damageBoost: 1.1, upgradeRange: 10 },
+            EMP: { name: 'ЕМІ', cost: 200, damage: 1, range: 120, cooldown: 200, color: '#d63384', icon: '🌀', upgradeCooldown: 15, stunDuration: 90, aoeRadius: 60 },
+
+            // --- ДОДАНІ 6 НОВИХ БАШЕН ---
+            FREEZE_RAY: { name: 'Променевий Заморожувач', cost: 320, damage: 10, range: 150, cooldown: 5, color: '#00bcd4', icon: '🥶', slowFactor: 0.2, stunDuration: 30, upgradeDamage: 5, upgradeCooldown: 0.5 },
+            BUNKER: { name: 'Бункер Бази', cost: 400, damage: 0, range: 0, cooldown: 0, color: '#7f8c8d', icon: '🛡️', maxLivesBonus: 5, upgradeBonus: 2 },
+            GRAVITY: { name: 'Гравітаційна Катушка', cost: 380, damage: 5, range: 100, cooldown: 10, color: '#34495e', icon: '⚫', pullForce: 0.1, aoeRadius: 100, upgradePull: 0.05 },
+            PULSE: { name: 'Пульс-Гармата', cost: 600, damage: 200, range: 400, cooldown: 200, color: '#9b59b6', icon: '🟣', piercing: 3, upgradeDamage: 100, upgradePiercing: 1 },
+            REPAIR: { name: 'Ремонтний Дрон', cost: 280, damage: 0, range: 150, cooldown: 300, color: '#f1c40f', icon: '🔧', healAmount: 1, upgradeHeal: 0.5 },
+            ARTILLERY: { name: 'Арт-Удар', cost: 700, damage: 500, range: 9999, cooldown: 400, color: '#e74c3c', icon: '💥', aoeRadius: 100, upgradeDamage: 250, upgradeCooldown: 20 },
+            
+            // --- ДОДАНІ 3 СУПЕР БАШНІ ---
+            DISINTEGRATOR: { name: 'Дезінтегратор', cost: 1200, damage: 5000, range: 9999, cooldown: 500, color: '#ff00ff', icon: '⚛️', upgradeDamage: 2500, upgradeCooldown: 25 },
+            TIME_TRAP: { name: 'Часова Пастка', cost: 1500, damage: 0, range: 200, cooldown: 600, color: '#9333ea', icon: '⏳', stunDuration: 180, aoeRadius: 200, upgradeDuration: 30, upgradeCooldown: 30 },
+            OMEGA_MINE: { name: 'Генератор Омега', cost: 2000, damage: 0, range: 0, cooldown: 0, color: '#06b6d4', icon: '💎', incomeAmount: 50, incomeRate: 300, upgradeIncome: 25, upgradeRate: 15 }, 
+            // --- КІНЕЦЬ СУПЕР БАШЕН ---
+        };
+
+        // Стан гри
+        let gold = 150;
+        let lives = maxBaseLives;
+        let wave = 0;
+        let isWaveActive = false;
+        let isGameOver = false;
+        let isPlacingTower = false; 
+        let currentTowerTypeToPlace = 'CANNON'; // Дефолтний тип
+        let selectedTower = null;
+
+        // Ігрові об'єкти
+        const enemies = [];
+        const towers = [];
+        const projectiles = [];
+        let logMessages = [];
+        const maxLogLength = 5;
+
+        // Посилання на DOM
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const goldEl = document.getElementById('gold');
+        const livesEl = document.getElementById('lives');
+        const waveEl = document.getElementById('wave');
+        const placementButtonsContainer = document.getElementById('placement-buttons');
+        const startWaveBtn = document.getElementById('start-wave-btn');
+        const gameLogEl = document.getElementById('game-log');
+
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        
+        const waveButtonTextEl = document.getElementById('wave-button-text');
+        
+        const upgradeTowerBtn = document.getElementById('upgrade-tower-btn');
+        const upgradeButtonTextEl = document.getElementById('upgrade-button-text');
+        const upgradeCostDisplayEl = document.getElementById('upgrade-cost-display');
+        const towerInfoEl = document.getElementById('tower-info');
+        const sellTowerBtn = document.getElementById('sell-tower-btn');
+        const sellValueDisplayEl = document.getElementById('sell-value-display');
+
+
+        // Визначення шляху (координати центру клітинок)
+        const path = [
+            {x: 0, y: 3.5}, {x: 4, y: 3.5}, {x: 4, y: 7.5}, {x: 16, y: 7.5}, {x: 16, y: 1.5}, 
+            {x: 12, y: 1.5}, {x: 12, y: 5.5}, {x: 8, y: 5.5}, {x: 8, y: 1.5}, {x: 10, y: 1.5}
+        ];
+        
+        // --- Управління UI та Журналом ---
+
+        function showModal(title, message, callback) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            modalCloseBtn.onclick = () => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                if (callback) callback();
+            };
+        }
+
+        function logMessage(message, type = 'info') {
+            const date = new Date().toLocaleTimeString();
+            let colorClass = 'text-military-text';
+            if (type === 'success') colorClass = 'text-green-400';
+            if (type === 'error') colorClass = 'text-integrity-red';
+            if (type === 'warning') colorClass = 'text-resource-yellow';
+            if (type === 'boss') colorClass = 'text-boss-purple font-bold'; 
+            if (type === 'income') colorClass = 'text-green-500';
+
+            const logEntry = `<span class="${colorClass}">[${date}] ${message}</span>`;
+            logMessages.unshift(logEntry);
+
+            if (logMessages.length > maxLogLength) {
+                logMessages.pop();
+            }
+
+            gameLogEl.innerHTML = logMessages.join('<br>');
+            gameLogEl.scrollTop = 0;
+        }
+
+        function updateUI() {
+            goldEl.textContent = gold.toFixed(0);
+            livesEl.textContent = lives.toFixed(0);
+            waveEl.textContent = wave;
+            
+            const nextWave = wave + 1;
+            const isBossWave = nextWave % BOSS_WAVE_INTERVAL === 0;
+
+            if (isBossWave && !isWaveActive) {
+                waveButtonTextEl.textContent = `Запустити Хвилю ${nextWave} (БОС ЗОМБІ!)`;
+            } else {
+                 waveButtonTextEl.textContent = isWaveActive ? `Хвиля ${wave} в дії...` : `Запустити Хвилю ${nextWave}`;
+            }
+
+            // Оновлення кнопок розміщення
+            Object.keys(TOWER_DEFINITIONS).forEach(type => {
+                const def = TOWER_DEFINITIONS[type];
+                const btn = document.getElementById(`place-${type.toLowerCase()}-btn`);
+                
+                if (btn) {
+                    btn.disabled = gold < def.cost;
+                    btn.classList.toggle('opacity-50', btn.disabled);
+                    
+                    const isSelected = isPlacingTower && currentTowerTypeToPlace === type;
+                    btn.classList.toggle('bg-orange-600', isSelected);
+                    
+                    if (isSelected) {
+                        Object.assign(btn.style, {'--depth-color': '#c2410c'});
+                    } else {
+                        // Reset style to allow class-based colors
+                        btn.style.cssText = null;
+                    }
+                }
+            });
+
+
+            // Оновлення секції покращення
+            if (selectedTower) {
+                const tower = selectedTower;
+                const nextLevel = tower.level + 1;
+                const currentUpgradeCost = UPGRADE_COST_BASE * tower.level;
+                const sellValue = Math.floor(tower.totalCost * SELL_REFUND_PERCENTAGE);
+                
+                let fireRate = 'N/A';
+                if (tower.cooldown > 0 && tower.type !== 'MINE' && tower.type !== 'SUPPORT' && tower.type !== 'BUNKER' && tower.type !== 'REPAIR' && tower.type !== 'OMEGA_MINE') {
+                    fireRate = (60 / tower.cooldown).toFixed(1); 
+                }
+
+                if (tower.type === 'MINE') {
+                    towerInfoEl.innerHTML = `Шахта ${tower.name} Рівень ${tower.level}<br>Дохід: +${tower.income} за хвилю.`;
+                } else if (tower.type === 'OMEGA_MINE') {
+                    towerInfoEl.innerHTML = `Генератор Омега ${tower.name} Рівень ${tower.level}<br>Дохід: +${tower.incomeAmount} кожні ${(tower.incomeRate / 60).toFixed(1)} сек.`;
+                } else if (tower.type === 'SUPPORT') {
+                    const boostPercent = ((TOWER_DEFINITIONS.SUPPORT.damageBoost + (tower.level - 1) * 0.02) * 100 - 100).toFixed(0);
+                    towerInfoEl.innerHTML = `Підтримка ${tower.name} Рівень ${tower.level}<br>Бонус: +${boostPercent}% шкоди | Дальність: ${tower.range}`;
+                } else if (tower.type === 'BUNKER') {
+                    const lifeBonus = TOWER_DEFINITIONS.BUNKER.maxLivesBonus + (tower.level - 1) * TOWER_DEFINITIONS.BUNKER.upgradeBonus;
+                    towerInfoEl.innerHTML = `Бункер ${tower.name} Рівень ${tower.level}<br>Бонус Життя: +${lifeBonus} Життів`;
+                } else if (tower.type === 'REPAIR') {
+                    const healAmount = TOWER_DEFINITIONS.REPAIR.healAmount + (tower.level - 1) * TOWER_DEFINITIONS.REPAIR.upgradeHeal;
+                    towerInfoEl.innerHTML = `Ремонтний Дрон ${tower.name} Рівень ${tower.level}<br>Лікування: ${healAmount.toFixed(1)} Життя/300 тіків`;
+                } else if (tower.type === 'TIME_TRAP') {
+                    const stunTime = (tower.stunDuration / 60).toFixed(1);
+                    towerInfoEl.innerHTML = `Часова Пастка ${tower.name} Рівень ${tower.level}<br>Стазис: ${stunTime} сек | Кулдаун: ${fireRate} сек`;
+                } else {
+                    towerInfoEl.innerHTML = `Турель ${tower.name} Рівень ${tower.level}<br>Шкода: ${tower.damage.toFixed(1)} | Дальність: ${tower.range} | Швидкість: ${fireRate}/сек.`;
+                }
+
+                // Кнопка покращення
+                if (tower.level < MAX_TOWER_LEVEL) {
+                    upgradeTowerBtn.disabled = gold < currentUpgradeCost;
+                    upgradeTowerBtn.classList.remove('bg-gray-600/50', 'bg-green-600/50');
+                    upgradeTowerBtn.classList.add(gold >= currentUpgradeCost ? 'bg-green-600' : 'bg-gray-600/50');
+                    upgradeButtonTextEl.textContent = `Покращити до Рівня ${nextLevel}`;
+                    upgradeCostDisplayEl.textContent = `Ціна: ${currentUpgradeCost} Ресурсів`;
+                } else {
+                    upgradeTowerBtn.disabled = true;
+                    upgradeTowerBtn.classList.remove('bg-green-600');
+                    upgradeTowerBtn.classList.add('bg-green-600/50');
+                    upgradeButtonTextEl.textContent = `МАКС. РІВЕНЬ`;
+                    upgradeCostDisplayEl.textContent = `Досягнуто Максимум`;
+                }
+
+                // Кнопка продажу
+                sellTowerBtn.disabled = false;
+                sellTowerBtn.classList.remove('bg-gray-600/50');
+                sellTowerBtn.classList.add('bg-integrity-red', 'btn-red');
+                sellValueDisplayEl.textContent = `Виручка: ${sellValue}`;
+
+            } else {
+                towerInfoEl.textContent = 'Натисніть на турель для вибору.';
+                upgradeTowerBtn.disabled = true;
+                upgradeTowerBtn.classList.remove('bg-green-600');
+                upgradeTowerBtn.classList.add('bg-gray-600/50');
+                upgradeButtonTextEl.textContent = 'Покращити';
+                upgradeCostDisplayEl.textContent = 'Виберіть ціль';
+
+                sellTowerBtn.disabled = true;
+                sellTowerBtn.classList.remove('bg-integrity-red', 'btn-red');
+                sellTowerBtn.classList.add('bg-gray-600/50');
+                sellValueDisplayEl.textContent = 'Виручка: -';
+            }
+
+            startWaveBtn.disabled = isWaveActive || isGameOver || isPlacingTower; 
+            startWaveBtn.classList.toggle('opacity-50', startWaveBtn.disabled);
+        }
+
+        // --- Класи Ігрових Об'єктів ---
+
+        class Enemy {
+            constructor(waveNumber) {
+                this.x = -TILE_SIZE; 
+                this.y = path[0].y * TILE_SIZE + TILE_SIZE / 2; 
+                this.pathIndex = 0;
+                this.maxHealth = (20 + waveNumber * 5) * 2;
+                this.health = this.maxHealth;
+                this.baseSpeed = 0.5 + waveNumber * 0.05;
+                this.speed = this.baseSpeed;
+                this.size = 15;
+                this.goldValue = 10 + waveNumber * 2;
+                this.isBoss = false;
+                this.slowTimer = 0; 
+                this.slowFactor = 1; 
+                this.stunTimer = 0;
+                this.dotTimer = 0;
+                this.dotDamage = 0;
+            }
+
+            draw() {
+                // Малюємо зомбі (використовуємо Emoji як спрайт)
+                ctx.save();
+                ctx.font = `${this.size * 2}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // Зміна кольору, якщо уповільнений
+                ctx.fillStyle = this.slowTimer > 0 ? '#4990e8' : '#556B2F'; 
+                
+                // Малюємо коло-тінь
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (this.stunTimer > 0) {
+                    ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size * 1.3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Малюємо Emoji
+                ctx.fillText('🧟', this.x, this.y); 
+
+                ctx.restore();
+                this.drawHealthBar();
+
+                if (this.dotTimer > 0) {
+                    ctx.fillStyle = 'rgba(253, 126, 20, 0.8)';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y - this.size, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            drawHealthBar() {
+                const healthWidth = this.size * 2;
+                const healthHeight = 4;
+                const currentHealthWidth = (this.health / this.maxHealth) * healthWidth;
+                ctx.fillStyle = '#555';
+                ctx.fillRect(this.x - this.size, this.y - this.size - 10, healthWidth, healthHeight);
+                ctx.fillStyle = '#dc3545';
+                ctx.fillRect(this.x - this.size, this.y - this.size - 10, currentHealthWidth, healthHeight);
+            }
+
+            update() {
+                // Оновлення ефектів
+                if (this.stunTimer > 0) {
+                    this.stunTimer--;
+                    return; // Не рухаємося, якщо застанені
+                }
+                if (this.dotTimer > 0) {
+                    this.dotTimer--;
+                    this.health -= this.dotDamage;
+                }
+
+                // Оновлення ефекту уповільнення
+                if (this.slowTimer > 0) {
+                    this.slowTimer--;
+                    // Використовуємо slowFactor від Freeze Ray, якщо він сильніший
+                    const slowF = this.slowFactor < TOWER_DEFINITIONS.SLOW.slowFactor ? this.slowFactor : TOWER_DEFINITIONS.SLOW.slowFactor;
+                    this.speed = this.baseSpeed * slowF;
+                } else {
+                    this.speed = this.baseSpeed;
+                    this.slowFactor = 1;
+                }
+
+                if (this.pathIndex < path.length) {
+                    const targetX = path[this.pathIndex].x * TILE_SIZE + TILE_SIZE / 2;
+                    const targetY = path[this.pathIndex].y * TILE_SIZE + TILE_SIZE / 2;
+                    const dx = targetX - this.x;
+                    const dy = targetY - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < this.speed) {
+                        this.x = targetX;
+                        this.y = targetY;
+                        this.pathIndex++;
+                    } else {
+                        this.x += (dx / distance) * this.speed;
+                        this.y += (dy / distance) * this.speed; 
+                    }
+                }
+            }
+        }
+        
+        class Boss extends Enemy {
+            constructor(waveNumber) {
+                super(waveNumber);
+                this.maxHealth = (500 + waveNumber * 50) * 2; 
+                this.health = this.maxHealth;
+                this.baseSpeed = 0.3 + waveNumber * 0.02; 
+                this.size = 20; // Збільшений розмір
+                this.goldValue = 150 + waveNumber * 20; 
+                this.isBoss = true;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.font = `${this.size * 2}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // Фон для Боса
+                ctx.fillStyle = this.slowTimer > 0 ? '#4990e8' : '#6f42c1'; // Фіолетовий
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 1.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (this.stunTimer > 0) {
+                    ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size * 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Малюємо Emoji (Череп/Скелет)
+                ctx.fillText('💀', this.x, this.y); 
+
+                ctx.restore();
+                this.drawHealthBar();
+
+                if (this.dotTimer > 0) {
+                    ctx.fillStyle = 'rgba(253, 126, 20, 0.8)';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y - this.size, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        class Tower {
+            constructor(spot, type) {
+                const def = TOWER_DEFINITIONS[type];
+                this.x = spot.x * TILE_SIZE;
+                this.y = spot.y * TILE_SIZE;
+                this.type = type;
+                this.name = def.name;
+                this.range = def.range;
+                this.level = 1;
+                this.damage = def.damage; 
+                this.cooldown = def.cooldown; 
+                this.currentCooldown = 0;
+                this.color = def.color;
+                this.icon = def.icon;
+                this.totalCost = def.cost;
+                
+                // Специфічні властивості
+                this.income = def.income || 0;
+                
+                // OMEGA_MINE properties
+                this.incomeAmount = def.incomeAmount || 0;
+                this.incomeRate = def.incomeRate || 0;
+                if (this.type === 'OMEGA_MINE') {
+                    this.currentCooldown = this.incomeRate;
+                }
+                
+                this.chainTargets = def.chainTargets || 0; // Для Тесли
+                this.slowDuration = def.slowDuration || 0; // для Уповінювача
+                this.damageMultiplier = 1.0; // для Вежі Підтримки
+                this.gatlingBonus = 0; // для Кулемета
+                this.piercing = def.piercing || 1; // для Пульс-Гармати
+                this.stunDuration = def.stunDuration || 0; // для Часової Пастки/ЕМІ
+                
+                // Спеціальна логіка для Бункера при розміщенні
+                if (this.type === 'BUNKER') {
+                    const bonus = def.maxLivesBonus;
+                    maxBaseLives += bonus;
+                    lives += bonus;
+                    logMessage(`Бункер розгорнуто! Макс. життя бази: +${bonus}.`, 'success');
+                }
+            }
+
+            upgrade(upgradeCost) {
+                if (this.level >= MAX_TOWER_LEVEL) return false;
+                const def = TOWER_DEFINITIONS[this.type];
+                
+                this.level++;
+                this.totalCost += upgradeCost;
+                
+                switch(this.type) {
+                    case 'MINE':
+                        this.income += def.upgradeIncome;
+                        break;
+                    case 'OMEGA_MINE':
+                        this.incomeAmount += def.upgradeIncome;
+                        this.incomeRate = Math.max(60, this.incomeRate - def.upgradeRate); // Швидше, мінімум 1 секунда
+                        break;
+                    case 'TESLA':
+                        this.damage += def.upgradeDamage;
+                        this.chainTargets++; 
+                        break;
+                    case 'SLOW':
+                        this.slowDuration += def.upgradeDuration; 
+                        this.cooldown = Math.max(20, this.cooldown - def.upgradeCooldown);
+                        break;
+                    case 'SNIPER':
+                        this.damage += def.upgradeDamage;
+                        this.cooldown = Math.max(60, this.cooldown - def.upgradeCooldown); 
+                        break;
+                    case 'SUPPORT':
+                        this.range += def.upgradeRange;
+                        break;
+                    case 'FREEZE_RAY':
+                        this.damage += def.upgradeDamage;
+                        this.cooldown = Math.max(1, this.cooldown - def.upgradeCooldown);
+                        break;
+                    case 'BUNKER':
+                        maxBaseLives += def.upgradeBonus;
+                        lives += def.upgradeBonus;
+                        break;
+                    case 'GRAVITY':
+                        this.range += 5; 
+                        break;
+                    case 'PULSE':
+                        this.damage += def.upgradeDamage;
+                        this.piercing += def.upgradePiercing;
+                        this.cooldown = Math.max(100, this.cooldown - 5);
+                        break;
+                    case 'REPAIR':
+                        this.cooldown = Math.max(100, this.cooldown - 20);
+                        break;
+                    case 'ARTILLERY':
+                        this.damage += def.upgradeDamage;
+                        this.cooldown = Math.max(180, this.cooldown - def.upgradeCooldown);
+                        break;
+                    case 'DISINTEGRATOR':
+                        this.damage += def.upgradeDamage;
+                        this.cooldown = Math.max(100, this.cooldown - def.upgradeCooldown);
+                        break;
+                    case 'TIME_TRAP':
+                        this.stunDuration += def.upgradeDuration;
+                        this.cooldown = Math.max(180, this.cooldown - def.upgradeCooldown);
+                        this.range += 10;
+                        break;
+                    default: 
+                        this.damage += def.upgradeDamage;
+                        if (def.upgradeCooldown) {
+                            this.cooldown = Math.max(5, this.cooldown - def.upgradeCooldown);
+                        }
+                        break;
+                }
+                return true;
+            }
+
+            draw() {
+                // Відображення діапазону при виборі
+                if (selectedTower === this && this.range > 0) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.range, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)'; 
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+                
+                // Основа турелі
+                ctx.fillStyle = this.color; 
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, TILE_SIZE / 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Візуалізація Часової Пастки
+                if (this.type === 'TIME_TRAP' && this.currentCooldown > this.cooldown - 10) {
+                     // Показуємо ефект активації (широке пульсуюче коло)
+                    const pulse = Math.abs(this.currentCooldown - this.cooldown) / 10;
+                    ctx.strokeStyle = this.color;
+                    ctx.lineWidth = 4;
+                    ctx.globalAlpha = 1 - pulse;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.range * pulse, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1.0;
+                }
+                
+                // Деталі турелі/Іконка
+                if (this.type === 'MINE' || this.type === 'BUNKER' || this.type === 'OMEGA_MINE') {
+                    ctx.fillStyle = '#1a1a1a';
+                    ctx.fillRect(this.x - 10, this.y - 10, 20, 20);
+                } else if (this.type !== 'SUPPORT') {
+                    // Стовбур
+                    ctx.fillStyle = '#343a40';
+                    ctx.fillRect(this.x - 4, this.y - 20, 8, 20);
+                }
+
+
+                // Рівень та іконка
+                ctx.fillStyle = this.level === MAX_TOWER_LEVEL ? '#ffc107' : '#dee2e6';
+                ctx.font = 'bold 12px Inter';
+                ctx.fillText(this.icon, this.x - 7, this.y + 5); 
+                ctx.fillText(`Lv${this.level}`, this.x - 10, this.y - 18);
+            }
+
+            update() {
+                // Економічні башти
+                if (this.type === 'MINE' || this.type === 'SUPPORT' || this.type === 'BUNKER') {
+                    return;
+                }
+                
+                if (this.type === 'OMEGA_MINE') {
+                    this.currentCooldown--;
+                    if (this.currentCooldown <= 0) {
+                        gold += this.incomeAmount;
+                        logMessage(`💎 Генератор Омега: +${this.incomeAmount} ресурсів!`, 'income');
+                        this.currentCooldown = this.incomeRate;
+                    }
+                    return;
+                }
+
+                if (this.type === 'GRAVITY') {
+                    this.applyGravityPull();
+                    return;
+                }
+
+                if (this.type === 'REPAIR') {
+                    this.repairBase();
+                    return;
+                }
+                
+                if (this.type === 'TIME_TRAP') {
+                    if (this.currentCooldown > 0) {
+                        this.currentCooldown--;
+                        return;
+                    }
+                    
+                    this.shootTimeTrap();
+                    this.currentCooldown = this.cooldown;
+                    return;
+                }
+
+                if (this.currentCooldown > 0) {
+                    this.currentCooldown--;
+                    const target = this.findTarget();
+                    if (!target && this.type === 'GATLING') this.gatlingBonus = 0;
+                    return;
+                }
+
+                if (this.type === 'FLAMETHROWER') {
+                    this.shootFlamethrower();
+                    this.currentCooldown = this.cooldown;
+                    return;
+                }
+
+                const target = this.findTarget();
+                if (target) {
+                    this.shoot(target);
+                    const def = TOWER_DEFINITIONS[this.type];
+                    if (this.type === 'GATLING') {
+                        this.gatlingBonus = Math.min(this.gatlingBonus + 1, 30); // Cap bonus
+                        this.currentCooldown = Math.max(1, this.cooldown - this.gatlingBonus * (def.upgradeCooldown || 0.5));
+                    } else {
+                        this.currentCooldown = this.cooldown;
+                    }
+                } else if (this.type === 'GATLING') {
+                    this.gatlingBonus = 0;
+                }
+            }
+            
+            applyGravityPull() {
+                const def = TOWER_DEFINITIONS.GRAVITY;
+                const currentPull = def.pullForce + (this.level - 1) * def.upgradePull;
+                
+                enemies.forEach(enemy => {
+                    const dx = enemy.x - this.x;
+                    const dy = enemy.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance <= this.range) {
+                        // Pull enemy towards the tower
+                        enemy.x -= (dx / distance) * currentPull;
+                        enemy.y -= (dy / distance) * currentPull;
+                    }
+                });
+            }
+
+            repairBase() {
+                if (this.currentCooldown === 0) {
+                    if (lives < maxBaseLives) {
+                        const def = TOWER_DEFINITIONS.REPAIR;
+                        const healAmount = def.healAmount + (this.level - 1) * def.upgradeHeal;
+                        lives = Math.min(maxBaseLives, lives + healAmount);
+                        logMessage(`Ремонтний дрон відновив +${healAmount.toFixed(1)} життя бази.`, 'income');
+                        this.currentCooldown = this.cooldown;
+                    }
+                } else {
+                    this.currentCooldown--;
+                }
+            }
+            
+            shootTimeTrap() {
+                let enemiesStunned = 0;
+                enemies.forEach(enemy => {
+                    const dx = enemy.x - this.x;
+                    const dy = enemy.y - this.y;
+                    if (Math.sqrt(dx * dx + dy * dy) <= this.range) {
+                        enemy.stunTimer = this.stunDuration;
+                        enemiesStunned++;
+                    }
+                });
+                if (enemiesStunned > 0) {
+                    logMessage(`⏳ Часова Пастка: ${enemiesStunned} ворогів зупинено на ${(this.stunDuration / 60).toFixed(1)} сек!`, 'boss');
+                }
+            }
+
+
+            findTarget() {
+                let bestTarget = null;
+                let highestPathIndex = -1;
+                let bestDistance = Infinity; 
+                let highestHealth = -1;
+
+                // Спеціальний пошук для Дезінтегратора (найбільше здоров'я, глобальний)
+                if (this.type === 'DISINTEGRATOR') {
+                    for (const enemy of enemies) {
+                        if (enemy.health > highestHealth) {
+                            highestHealth = enemy.health;
+                            bestTarget = enemy;
+                        }
+                    }
+                    return bestTarget; // Повертаємо, якщо знайшли
+                }
+                
+                // Стандартний пошук (найближче до кінця, в межах радіусу)
+                for (const enemy of enemies) {
+                    const dx = enemy.x - this.x;
+                    const dy = enemy.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance <= this.range) {
+                        if (this.type === 'MORTAR' && distance < TOWER_DEFINITIONS.MORTAR.minRange) {
+                            continue;
+                        }
+                        // Пріоритет: чим ближче до кінця шляху
+                        if (enemy.pathIndex > highestPathIndex) {
+                            highestPathIndex = enemy.pathIndex;
+                            bestTarget = enemy;
+                            bestDistance = distance;
+                        } else if (enemy.pathIndex === highestPathIndex && distance < bestDistance) {
+                            // Якщо однаковий індекс, стріляємо у найближчого
+                            bestTarget = enemy;
+                            bestDistance = distance;
+                        }
+                    }
+                }
+                return bestTarget;
+            }
+
+            shoot(target) {
+                const finalDamage = this.damage * this.damageMultiplier;
+
+                if (this.type === 'TESLA') {
+                    this.shootTesla(target, finalDamage);
+                } else {
+                    projectiles.push(new Projectile(this.x, this.y, target, finalDamage, this.type));
+                }
+            }
+            
+            shootFlamethrower() {
+                const def = TOWER_DEFINITIONS.FLAMETHROWER;
+                const target = this.findTarget();
+                if (!target) return;
+
+                const angleToTarget = Math.atan2(target.y - this.y, target.x - this.x);
+
+                for (const enemy of enemies) {
+                    const dx = enemy.x - this.x;
+                    const dy = enemy.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance <= this.range) {
+                        const angleToEnemy = Math.atan2(dy, dx);
+                        let angleDiff = Math.abs(angleToTarget - angleToEnemy);
+                        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                        
+                        if (angleDiff < Math.PI / 4) { // 45 degree cone
+                            enemy.dotDamage = this.damage * this.damageMultiplier;
+                            enemy.dotTimer = def.dotDuration;
+                        }
+                    }
+                }
+            }
+
+            shootTesla(startTarget, damage) {
+                projectiles.push(new Projectile(this.x, this.y, startTarget, damage, this.type));
+                
+                let currentTarget = startTarget;
+                const hitEnemies = [startTarget];
+                
+                for (let i = 0; i < this.chainTargets; i++) {
+                    let nextTarget = null;
+                    let closestDistance = Infinity;
+
+                    for (const enemy of enemies) {
+                        if (!hitEnemies.includes(enemy)) {
+                            const dx = enemy.x - currentTarget.x;
+                            const dy = enemy.y - currentTarget.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            
+                            if (distance < 60 && distance < closestDistance) { 
+                                closestDistance = distance;
+                                nextTarget = enemy;
+                            }
+                        }
+                    }
+
+                    if (nextTarget) {
+                        projectiles.push(new Projectile(currentTarget.x, currentTarget.y, nextTarget, damage, 'TESLA_CHAIN'));
+                        hitEnemies.push(nextTarget);
+                        currentTarget = nextTarget;
+                    } else {
+                        break; 
+                    }
+                }
+            }
+        }
+
+        class Projectile {
+            constructor(x, y, target, damage, type) {
+                this.x = x;
+                this.y = y;
+                this.target = target;
+                this.damage = damage;
+                this.type = type;
+
+                const def = TOWER_DEFINITIONS[type] || {};
+                this.speed = type === 'SNIPER' || type === 'RAILGUN' || type === 'PULSE' ? 20 : 
+                             type === 'ARTILLERY' ? 5 : 
+                             type === 'DISINTEGRATOR' ? 5 : 8; // Дезінтегратор повільний
+                this.size = type === 'SNIPER' ? 3 : 
+                            type === 'ARTILLERY' ? 8 : 
+                            type === 'DISINTEGRATOR' ? 10 : 5; // Великий снаряд
+                
+                this.slowDuration = type === 'SLOW' ? TOWER_DEFINITIONS.SLOW.slowDuration : 
+                                    type === 'FREEZE_RAY' ? TOWER_DEFINITIONS.FREEZE_RAY.stunDuration : 0;
+                this.aoeRadius = def.aoeRadius || 0;
+                this.stunDuration = def.stunDuration || 0;
+                this.piercing = def.piercing || 1; 
+
+                // Снаряди, що летять прямо (PULSE, RAILGUN, ARTILLERY, DISINTEGRATOR)
+                if (type === 'RAILGUN' || type === 'PULSE' || type === 'ARTILLERY' || type === 'DISINTEGRATOR') {
+                    this.hitEnemies = [];
+                    const angle = Math.atan2(target.y - y, target.x - x);
+                    this.dx = Math.cos(angle);
+                    this.dy = Math.sin(angle);
+                    
+                    if (type === 'ARTILLERY') {
+                        this.targetX = target.x;
+                        this.targetY = target.y;
+                    } else if (type === 'DISINTEGRATOR') {
+                         this.targetX = target.x;
+                         this.targetY = target.y;
+                    }
+                }
+            }
+
+            draw() {
+                // Снаряд (трасер)
+                ctx.fillStyle = this.type === 'TESLA' || this.type === 'TESLA_CHAIN' ? '#0d6efd' : 
+                                this.type === 'SLOW' ? '#8cb4ff' : 
+                                this.type === 'EMP' ? '#d63384' :
+                                this.type === 'FREEZE_RAY' ? '#00bcd4' :
+                                this.type === 'PULSE' ? '#9b59b6' :
+                                this.type === 'ARTILLERY' ? '#e74c3c' :
+                                this.type === 'DISINTEGRATOR' ? '#ff00ff' : // Супер колір
+                                this.type === 'RAILGUN' ? '#0dcaf0' :
+                                '#ffc107';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (this.type === 'RAILGUN' || this.type === 'PULSE' || this.type === 'DISINTEGRATOR') {
+                    ctx.strokeStyle = this.type === 'PULSE' ? '#9b59b6aa' : 
+                                      this.type === 'DISINTEGRATOR' ? '#ff00ffaa' : '#0dcaf0aa';
+                    ctx.lineWidth = this.type === 'DISINTEGRATOR' ? 5 : 3;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x - this.dx * 30, this.y - this.dy * 30);
+                    ctx.lineTo(this.x, this.y);
+                    ctx.stroke();
+                }
+            }
+
+            update() {
+                if (!this.target && (this.type !== 'RAILGUN' && this.type !== 'PULSE' && this.type !== 'ARTILLERY' && this.type !== 'DISINTEGRATOR')) return true; 
+                
+                // Снаряди, що летять прямо
+                if (this.type === 'RAILGUN' || this.type === 'PULSE' || this.type === 'ARTILLERY' || this.type === 'DISINTEGRATOR') {
+                    this.x += this.dx * this.speed;
+                    this.y += this.dy * this.speed;
+                    
+                    const isExplosionType = this.type === 'ARTILLERY' || this.type === 'DISINTEGRATOR';
+                    let targetReached = false;
+
+                    if (isExplosionType) {
+                        const dxToTarget = this.targetX - this.x;
+                        const dyToTarget = this.targetY - this.y;
+                        const distToTarget = Math.sqrt(dxToTarget * dxToTarget + dyToTarget * dyToTarget);
+                        
+                        if (distToTarget < this.speed) {
+                            targetReached = true;
+                            
+                            if (this.type === 'ARTILLERY') {
+                                enemies.forEach(enemy => {
+                                    const dist = Math.sqrt(Math.pow(enemy.x - this.targetX, 2) + Math.pow(enemy.y - this.targetY, 2));
+                                    if (dist < TOWER_DEFINITIONS.ARTILLERY.aoeRadius) {
+                                        enemy.health -= this.damage;
+                                    }
+                                });
+                                logMessage(`💥 Арт-Удар по ${this.targetX.toFixed(0)},${this.targetY.toFixed(0)}!`, 'warning');
+                            } else if (this.type === 'DISINTEGRATOR' && this.target && this.target.health > 0) {
+                                this.target.health -= this.damage;
+                                logMessage(`⚛️ Дезінтегратор вдарив по БОСУ! -${this.damage} шкоди.`, 'boss');
+                            }
+                        }
+                    }
+
+                    if (targetReached) return true;
+
+                    for (const enemy of enemies) {
+                        if (!this.hitEnemies.includes(enemy)) {
+                            const dist = Math.sqrt(Math.pow(enemy.x - this.x, 2) + Math.pow(enemy.y - this.y, 2));
+                            if (dist < enemy.size) {
+                                enemy.health -= this.damage;
+                                this.hitEnemies.push(enemy);
+                                
+                                if (this.hitEnemies.length >= this.piercing) {
+                                    return true; // Зупиняємося, якщо пробили максимальну кількість
+                                }
+                            }
+                        }
+                    }
+                    return (this.x < -30 || this.x > CANVAS_WIDTH + 30 || this.y < -30 || this.y > CANVAS_HEIGHT + 30);
+                }
+
+                
+                // Звичайні снаряди
+                if (this.target.health <= 0) return true; 
+                
+                const dx = this.target.x - this.x;
+                const dy = this.target.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < this.speed) {
+                    // Зіткнення
+                    this.target.health -= this.damage;
+                    
+                    if (this.slowDuration > 0) {
+                        this.target.slowTimer = this.slowDuration;
+                        
+                        if (this.type === 'FREEZE_RAY') {
+                           this.target.stunTimer = this.slowDuration; // FREEZE RAY - це stun
+                           this.target.slowFactor = TOWER_DEFINITIONS.FREEZE_RAY.slowFactor;
+                        } else {
+                           this.target.slowFactor = TOWER_DEFINITIONS.SLOW.slowFactor;
+                        }
+                    }
+
+                    if (this.aoeRadius > 0) {
+                        enemies.forEach(enemy => {
+                            if (enemy === this.target) return;
+                            const dist = Math.sqrt(Math.pow(enemy.x - this.target.x, 2) + Math.pow(enemy.y - this.target.y, 2));
+                            if (dist < this.aoeRadius) {
+                                if (this.stunDuration > 0) { // EMP
+                                    enemy.stunTimer = this.stunDuration;
+                                }
+                                enemy.health -= this.damage * (this.type === 'CANNON' ? 0.5 : 1); 
+                            }
+                        });
+                        // Stun the main target as well
+                        if (this.stunDuration > 0) this.target.stunTimer = this.stunDuration;
+                    }
+                    
+                    return true; 
+                } else {
+                    this.x += (dx / distance) * this.speed;
+                    this.y += (dy / distance) * this.speed;
+                    return false; 
+                }
+            }
+        }
+
+        // --- Функції Рендерингу ---
+
+        function drawPath() {
+            // Малюємо асфальтову дорогу
+            ctx.lineWidth = TILE_SIZE; 
+            ctx.strokeStyle = '#495057'; 
+            ctx.beginPath();
+            ctx.moveTo(0, path[0].y * TILE_SIZE + TILE_SIZE / 2); 
+            path.forEach(p => ctx.lineTo(p.x * TILE_SIZE + TILE_SIZE / 2, p.y * TILE_SIZE + TILE_SIZE / 2));
+            ctx.stroke();
+
+            // Розмітка
+            ctx.lineWidth = 3; 
+            ctx.strokeStyle = '#adb5bd'; 
+            ctx.setLineDash([15, 15]);
+            ctx.beginPath();
+            ctx.moveTo(0, path[0].y * TILE_SIZE + TILE_SIZE / 2);
+            path.forEach(p => ctx.lineTo(p.x * TILE_SIZE + TILE_SIZE / 2, p.y * TILE_SIZE + TILE_SIZE / 2));
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+
+            // Малюємо фініш (База)
+            const finishX = path[path.length - 1].x * TILE_SIZE + TILE_SIZE / 2;
+            const finishY = path[path.length - 1].y * TILE_SIZE + TILE_SIZE / 2;
+            ctx.fillStyle = '#343a40'; 
+            ctx.fillRect(finishX - TILE_SIZE, finishY - TILE_SIZE, TILE_SIZE*2, TILE_SIZE*2);
+            ctx.fillStyle = '#ffc107'; 
+            ctx.font = 'bold 16px Inter';
+            ctx.fillText('БАЗА', finishX - 20, finishY + 5);
+        }
+        
+        function draw() {
+            ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT); 
+            drawPath();
+            towers.forEach(t => t.draw());
+            enemies.forEach(e => e.draw());
+            projectiles.forEach(p => p.draw());
+        }
+        
+        function handleUpgradeTower() {
+            if (!selectedTower || isGameOver) return;
+            const tower = selectedTower;
+            const upgradeCost = UPGRADE_COST_BASE * tower.level;
+
+            if (tower.level >= MAX_TOWER_LEVEL) {
+                showModal("Покращення неможливе", "Турель вже має максимальний рівень.");
+                return;
+            }
+            if (gold < upgradeCost) {
+                showModal("Недостатньо Ресурсів", `Для покращення потрібно ${upgradeCost} ресурсів.`);
+                return;
+            }
+
+            if (tower.upgrade(upgradeCost)) {
+                gold -= upgradeCost;
+                logMessage(`Турель ${tower.name} покращена до Рівня ${tower.level}.`, 'success');
+                updateUI();
+            }
+        }
+        
+        function handleSellTower() {
+            if (!selectedTower || isGameOver) return;
+            
+            const towerToSell = selectedTower;
+            const refund = Math.floor(towerToSell.totalCost * SELL_REFUND_PERCENTAGE);
+            
+            gold += refund;
+            
+            // Спеціальна логіка для Бункера при продажу
+            if (towerToSell.type === 'BUNKER') {
+                const def = TOWER_DEFINITIONS.BUNKER;
+                const bonusPerLevel = def.maxLivesBonus + (towerToSell.level - 1) * def.upgradeBonus;
+                maxBaseLives -= bonusPerLevel;
+                lives = Math.min(lives, maxBaseLives); // Зменшуємо поточне життя, якщо воно перевищує новий макс.
+                logMessage(`Бункер продано. Макс. життя бази зменшено на ${bonusPerLevel}.`, 'warning');
+            }
+
+
+            const index = towers.indexOf(towerToSell);
+            if (index > -1) {
+                towers.splice(index, 1);
+            }
+            
+            logMessage(`Турель ${towerToSell.name} продана за ${refund} ресурсів.`, 'warning');
+            
+            selectedTower = null;
+            updateUI();
+        }
+
+        function handleEndOfWaveIncome() {
+            const mineTowers = towers.filter(t => t.type === 'MINE');
+            if (mineTowers.length > 0) {
+                let totalIncome = 0;
+                mineTowers.forEach(mine => {
+                    totalIncome += mine.income;
+                });
+                gold += totalIncome;
+                logMessage(`Шахти принесли +${totalIncome} ресурсів за хвилю.`, 'income');
+            }
+        }
+
+        function applySupportBuffs() {
+            towers.forEach(t => t.damageMultiplier = 1.0);
+
+            const supportTowers = towers.filter(t => t.type === 'SUPPORT');
+            const otherTowers = towers.filter(t => t.type !== 'SUPPORT' && t.type !== 'MINE' && t.type !== 'BUNKER' && t.type !== 'REPAIR' && t.type !== 'GRAVITY' && t.type !== 'OMEGA_MINE');
+
+            for (const support of supportTowers) {
+                for (const other of otherTowers) {
+                    const dx = support.x - other.x;
+                    const dy = support.y - other.y;
+                    if (Math.sqrt(dx*dx + dy*dy) <= support.range) {
+                        other.damageMultiplier *= TOWER_DEFINITIONS.SUPPORT.damageBoost + ((support.level - 1) * 0.02);
+                    }
+                }
+            }
+        }
+
+        // --- Основна Логіка Гри ---
+
+        function update() {
+            if (isGameOver) return;
+
+            applySupportBuffs();
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                enemy.update();
+
+                if (enemy.pathIndex >= path.length) {
+                    lives--;
+                    enemies.splice(i, 1); 
+                    logMessage('Зомбі прорвався! Цілісність бази -1.', 'error');
+                } else if (enemy.health <= 0) {
+                    gold += enemy.goldValue;
+                    
+                    if (enemy.isBoss) {
+                        logMessage(`🔥 БОС ЗОМБІ ЗНИЩЕНИЙ! +${enemy.goldValue} ресурсів!`, 'boss');
+                    } else {
+                        logMessage(`Зомбі знищено! +${enemy.goldValue} ресурсів.`, 'success');
+                    }
+                    enemies.splice(i, 1); 
+                }
+            }
+
+            towers.forEach(t => t.update());
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                if (projectiles[i].update()) {
+                    projectiles.splice(i, 1);
+                }
+            }
+
+            if (lives <= 0) {
+                isGameOver = true;
+                showModal("Повний Зомбі-Апокаліпсис!", `Вашу базу знищено. Ви протримались до Хвилі ${wave}.`, () => initGame());
+            }
+
+            if (isWaveActive && enemies.length === 0) {
+                isWaveActive = false;
+                logMessage(`Хвиля ${wave} відбита!`, 'warning');
+                handleEndOfWaveIncome();
+                gold += 50 + (wave % BOSS_WAVE_INTERVAL === 0 ? 100 : 0); 
+                updateUI();
+            }
+            updateUI();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function handleSelectTowerType(type) {
+             const def = TOWER_DEFINITIONS[type];
+            if (gold < def.cost) {
+                showModal("Дія неможлива", `Недостатньо ресурсів. Потрібно ${def.cost} для ${def.name}.`);
+                isPlacingTower = false;
+                selectedTower = null;
+                updateUI();
+                return;
+            }
+            
+            selectedTower = null;
+            
+            if (isPlacingTower && currentTowerTypeToPlace === type) {
+                // Скасувати
+                isPlacingTower = false;
+                logMessage(`Розгортання ${def.name} скасовано.`, 'info');
+            } else {
+                // Активувати розміщення
+                currentTowerTypeToPlace = type;
+                isPlacingTower = true;
+                logMessage(`Режим розгортання: виберіть позицію для ${def.name}.`, 'info');
+            }
+            updateUI();
+        }
+
+        function isOnPath(px, py) {
+            const clearance = TILE_SIZE * 0.8; 
+
+            for (let i = 0; i < path.length - 1; i++) {
+                const p1x = path[i].x * TILE_SIZE + TILE_SIZE / 2;
+                const p1y = path[i].y * TILE_SIZE + TILE_SIZE / 2;
+                const p2x = path[i+1].x * TILE_SIZE + TILE_SIZE / 2;
+                const p2y = path[i+1].y * TILE_SIZE + TILE_SIZE / 2;
+                
+                if (p1x === p2x) { // Вертикальний сегмент
+                    if (px > p1x - clearance && px < p1x + clearance &&
+                        py > Math.min(p1y, p2y) - clearance && py < Math.max(p1y, p2y) + clearance) {
+                        return true;
+                    }
+                } else if (p1y === p2y) { // Горизонтальний сегмент
+                    if (py > p1y - clearance && py < p1y + clearance &&
+                        px > Math.min(p1x, p2x) - clearance && px < Math.max(p1x, p2x) + clearance) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function placeTowerAt(e) {
+            e.preventDefault(); 
+            if (isGameOver) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            const clickX = (clientX - rect.left) * scaleX;
+            const clickY = (clientY - rect.top) * scaleY;
+            
+            let towerClicked = false;
+
+            // 1. Перевірка натискання на вже існуючу турель
+            for(const tower of towers) {
+                const dx = clickX - tower.x;
+                const dy = clickY - tower.y;
+                if (Math.sqrt(dx * dx + dy * dy) < TILE_SIZE / 2) { 
+                    selectedTower = tower;
+                    isPlacingTower = false;
+                    logMessage(`Турель ${tower.name} вибрана.`, 'info');
+                    towerClicked = true;
+                    break;
+                }
+            }
+            
+            if (towerClicked) {
+                 updateUI();
+                 return;
+            }
+            
+            // 2. Розміщення нової турелі
+            if (isPlacingTower) {
+                const type = currentTowerTypeToPlace;
+                const def = TOWER_DEFINITIONS[type];
+                selectedTower = null;
+                
+                // Перевірка, чи не на шляху
+                if (isOnPath(clickX, clickY)) {
+                    showModal("Розміщення неможливе", "Не можна будувати на шляху зомбі!");
+                    return;
+                }
+                
+                // Перевірка, чи не заблизько до іншої башти
+                for (const tower of towers) {
+                    const dx = clickX - tower.x;
+                    const dy = clickY - tower.y;
+                    if (Math.sqrt(dx * dx + dy * dy) < TILE_SIZE) {
+                        showModal("Розміщення неможливе", "Занадто близько до іншої турелі.");
+                        return;
+                    }
+                }
+                
+                if (gold < def.cost) {
+                    showModal("Недостатньо Ресурсів", `Для побудови ${def.name} потрібно ${def.cost} ресурсів.`);
+                    isPlacingTower = false;
+                    updateUI();
+                    return; 
+                }
+                
+                gold -= def.cost;
+                const newSpot = { x: clickX / TILE_SIZE, y: clickY / TILE_SIZE };
+                towers.push(new Tower(newSpot, type));
+                logMessage(`${def.name} розгорнуто! -${def.cost} ресурсів.`, 'success');
+                isPlacingTower = false; 
+            } else {
+                selectedTower = null; 
+            }
+            updateUI();
+        }
+
+        function startWave() {
+            if (isWaveActive || isGameOver) return;
+            if (isPlacingTower) {
+                logMessage("Завершіть розгортання турелі перед початком хвилі!", 'warning');
+                return;
+            }
+            selectedTower = null; 
+            wave++;
+            const isBossWave = wave % BOSS_WAVE_INTERVAL === 0;
+            isWaveActive = true;
+            logMessage(isBossWave ? `🚨 ЗОМБІ-БОС! Наближається важка техніка! Хвиля ${wave}! 🚨` : `Хвиля ${wave} почалась! Зомбі наступають!`, isBossWave ? 'boss' : 'warning');
+            
+            const numEnemies = isBossWave ? 1 : (5 + (wave % BOSS_WAVE_INTERVAL) * 2);
+            let spawnCount = 0;
+
+            const spawner = setInterval(() => {
+                if (spawnCount < numEnemies) {
+                    enemies.push(isBossWave ? new Boss(wave) : new Enemy(wave));
+                    spawnCount++;
+                } else {
+                    clearInterval(spawner);
+                }
+            }, isBossWave ? 1000 : 500); 
+
+            updateUI();
+        }
+
+        function resetGame() {
+            gold = 150;
+            maxBaseLives = 10;
+            lives = maxBaseLives;
+            wave = 0;
+            isWaveActive = false;
+            isGameOver = false;
+            isPlacingTower = false;
+            currentTowerTypeToPlace = 'CANNON';
+            selectedTower = null; 
+            enemies.length = 0;
+            towers.length = 0;
+            projectiles.length = 0;
+            logMessages.length = 0;
+        }
+        
+        function setupPlacementButtons() {
+            placementButtonsContainer.innerHTML = ''; 
+            
+            const buttonOrder = [
+                'CANNON', 'FLAMETHROWER', 'GATLING', 'SNIPER', 'ROCKET_LAUNCHER', 'MORTAR', 
+                'TESLA', 'RAILGUN', 'SLOW', 'EMP', 'SUPPORT', 'MINE',
+                'FREEZE_RAY', 'BUNKER', 'GRAVITY', 'PULSE', 'REPAIR', 'ARTILLERY',
+                'DISINTEGRATOR', 'TIME_TRAP', 'OMEGA_MINE' // Нові Супер Башти
+            ]; 
+
+            buttonOrder.forEach(type => {
+                const def = TOWER_DEFINITIONS[type];
+                const button = document.createElement('button');
+                
+                let colorClass = 'bg-gray-700 btn-dark';
+                let textColor = 'text-white';
+                
+                let isSuper = def.cost >= 1000;
+
+                if (type === 'CANNON') { colorClass = 'bg-military-green btn-green'; }
+                else if (type === 'SNIPER') { colorClass = 'bg-gray-800 btn-dark'; }
+                else if (type === 'TESLA') { colorClass = 'bg-ui-accent btn-blue'; }
+                else if (type === 'SLOW') { colorClass = 'bg-military-green/80 btn-green'; }
+                else if (type === 'MINE') { colorClass = 'bg-resource-yellow btn-yellow'; textColor = 'text-black'; }
+                else if (type === 'FLAMETHROWER') { colorClass = 'bg-orange-500'; Object.assign(button.style, {'--depth-color': '#b85d10'}); }
+                else if (type === 'ROCKET_LAUNCHER') { colorClass = 'bg-purple-700'; Object.assign(button.style, {'--depth-color': '#4c2a85'}); }
+                else if (type === 'GATLING') { colorClass = 'bg-gray-600'; Object.assign(button.style, {'--depth-color': '#374151'}); }
+                else if (type === 'MORTAR') { colorClass = 'bg-gray-500'; Object.assign(button.style, {'--depth-color': '#4b5563'}); }
+                else if (type === 'RAILGUN') { colorClass = 'bg-cyan-500'; Object.assign(button.style, {'--depth-color': '#0891b2'}); }
+                else if (type === 'SUPPORT') { colorClass = 'bg-teal-500'; Object.assign(button.style, {'--depth-color': '#0d9488'}); }
+                else if (type === 'EMP') { colorClass = 'bg-pink-600'; Object.assign(button.style, {'--depth-color': '#be185d'}); }
+                // Середні башти
+                else if (type === 'FREEZE_RAY') { colorClass = 'bg-cyan-700'; Object.assign(button.style, {'--depth-color': '#0e7490'}); }
+                else if (type === 'BUNKER') { colorClass = 'bg-gray-500'; Object.assign(button.style, {'--depth-color': '#6b7280'}); }
+                else if (type === 'GRAVITY') { colorClass = 'bg-gray-900'; Object.assign(button.style, {'--depth-color': '#1f2937'}); }
+                else if (type === 'PULSE') { colorClass = 'bg-purple-500'; Object.assign(button.style, {'--depth-color': '#7e22ce'}); }
+                else if (type === 'REPAIR') { colorClass = 'bg-yellow-600'; Object.assign(button.style, {'--depth-color': '#ca8a04'}); }
+                else if (type === 'ARTILLERY') { colorClass = 'bg-red-700'; Object.assign(button.style, {'--depth-color': '#b91c1c'}); }
+                // СУПЕР БАШТИ
+                else if (type === 'DISINTEGRATOR') { colorClass = 'bg-fuchsia-600'; Object.assign(button.style, {'--depth-color': '#a21caf'}); }
+                else if (type === 'TIME_TRAP') { colorClass = 'bg-indigo-600'; Object.assign(button.style, {'--depth-color': '#4f46e5'}); }
+                else if (type === 'OMEGA_MINE') { colorClass = 'bg-sky-500'; Object.assign(button.style, {'--depth-color': '#0ea5e9'}); }
+                
+                
+                button.id = `place-${type.toLowerCase()}-btn`;
+                button.className = `action-button ${colorClass} ${textColor} py-2 px-1 rounded-md font-bold flex flex-col items-center justify-center text-center text-xs ${isSuper ? 'border-2 border-resource-yellow' : ''}`;
+
+                const nameTextColorClass = (textColor === 'text-black') ? 'text-gray-900/80' : 'text-white';
+                
+                button.innerHTML = `
+                    <span class="text-lg">${def.icon}</span>
+                    <span class="text-sm ${nameTextColorClass} ${isSuper ? 'text-resource-yellow' : ''} font-extrabold">${def.name}</span>
+                    <span class="text-xs font-normal text-military-text/90 ${textColor === 'text-black' ? 'text-gray-900/80' : 'text-resource-yellow/90'} mt-1">
+                        ${def.cost}
+                    </span>
+                `;
+                
+                button.addEventListener('click', () => handleSelectTowerType(type));
+                
+                placementButtonsContainer.appendChild(button);
+            });
+        }
+
+        function initGame() {
+            resetGame();
+            logMessage("Системи готові. Побудуйте оборону.", 'info');
+            setupPlacementButtons(); 
+
+            startWaveBtn.addEventListener('click', startWave);
+            upgradeTowerBtn.addEventListener('click', handleUpgradeTower);
+            sellTowerBtn.addEventListener('click', handleSellTower);
+            
+            canvas.addEventListener('click', placeTowerAt); 
+            canvas.addEventListener('touchstart', placeTowerAt, { passive: false });
+
+            gameLoop();
+            updateUI();
+        }
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>
